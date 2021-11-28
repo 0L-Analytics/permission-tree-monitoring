@@ -1,0 +1,30 @@
+{
+  "name": "permission-tree-monitoring",
+  "version": "0.0.1",
+  "description": "0L Permission Tree Scraper",
+  "main": "index.js",
+  "license": "MIT",
+  "author": {
+    "name": "Andrew Gouin",
+    "email": "andrew.c.gouin@gmail.com"
+  },
+  "dependencies": {
+    "@koa/router": "^10.1.1",
+    "@types/axios": "^0.14.0",
+    "@types/node": "^16.11.10",
+    "axios": "^0.24.0",
+    "eventsource": "^1.1.0",
+    "koa": "^2.13.4",
+    "koa-bodyparser": "^4.3.0",
+    "lodash": "^4.17.21",
+    "mongoose": "^6.0.13",
+    "nodemon": "^2.0.15",
+    "ts-node": "^10.4.0",
+    "typescript": "^4.4.4"
+  },
+  "scripts": {
+    "start": "ts-node index.ts",
+    "dev": "nodemon index.ts --watch routers/",
+    "scrape": "ts-node lib/scrape.ts"
+  }
+}

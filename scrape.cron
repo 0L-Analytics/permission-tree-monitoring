@@ -1,0 +1,3 @@
+#!/bin/bash
+cd /code
+yarn run scrape

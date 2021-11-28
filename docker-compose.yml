@@ -1,0 +1,29 @@
+version: '3'
+services:
+  0l:
+    build: .
+    command: yarn dev
+    environment:
+      - PORT=3028
+      - NODE_HOSTNAME=35.231.138.89
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    ports:
+      - "3028:3028"
+    volumes:
+      - ./lib:/code/lib
+      - ./routers:/code/routers
+      - ./index.ts:/code/index.ts
+      - ./tsconfig.json:/code/tsconfig.json
+      - ./package.json:/code/package.json
+  mongodb:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
