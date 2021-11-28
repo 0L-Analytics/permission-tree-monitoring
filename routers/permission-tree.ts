@@ -4,7 +4,7 @@ import { pick } from 'lodash'
 
 const router = new Router({prefix: '/permission-tree'})
 
-const MINER_PARAMS_TO_RETURN = ['parent', 'version_onboarded', 'has_tower', 'is_active']
+const MINER_PARAMS_TO_RETURN = ['address', 'parent', 'version_onboarded', 'has_tower', 'is_active']
 
 router.get('/miner/:address', async ctx => {
   const address  = ctx.params.address.toLowerCase()
@@ -21,7 +21,7 @@ router.get('/miner/:address', async ctx => {
   }
 })
 
-const VALIDATOR_PARAMS_TO_RETURN = ['parent', 'version_onboarded']
+const VALIDATOR_PARAMS_TO_RETURN = ['address', 'parent', 'version_onboarded']
 
 router.get('/validator/:address', async ctx => {
   const address  = ctx.params.address.toLowerCase()

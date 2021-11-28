@@ -2,6 +2,54 @@
 
 [koa.js](https://koajs.com/) API to fetch 0L permission trees for miners and validators.
 
+## API Spec
+
+### Get Statistics
+
+`GET /permission-tree/stats`
+
+```typescript
+interface StatsResponse {
+  allAccountCount: number, // All accounts
+  allMinerCount: number, // All accounts with tower height > 0
+  activeMinerCount: number // All accounts that have submitted proofs in current epoch
+}
+```
+
+### Get Validator Permission Tree
+
+`GET /permission-tree/validator/:address`
+
+```typescript
+interface PermissionNodeValidator {
+  address: string // Address of this validator
+  parent: string // Address of validator that onboarded this validator
+  version_onboarded: number // Height when validator was onboarded
+}
+
+interface ValidatorPermissionTreeResponse extends PermissionNodeValidator {
+  children: PermissionNodeValidator[]
+}
+```
+
+### Get Miner Permission Tree
+
+`GET /permission-tree/miner/:address`
+
+```typescript
+interface PermissionNodeMiner {
+  address: string // Address of this validator
+  parent: string // Address of validator that onboarded this validator
+  version_onboarded: number // Height when validator was onboarded
+  has_tower: boolean // Does miner have tower height > 0 ?
+  is_active: boolean // Has miner submitted proofs in current epoch?
+}
+
+interface MinerPermissionTreeResponse extends PermissionNodeValidator {
+  children: PermissionNodeMiner[]
+}
+```
+
 ## Setup
 
 Install [docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/)
