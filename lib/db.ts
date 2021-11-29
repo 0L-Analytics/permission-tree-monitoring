@@ -1,8 +1,8 @@
 import { Schema, model, connect } from 'mongoose'
 
-const { MONGO_INITDB_ROOT_USERNAME, MONGO_INITDB_ROOT_PASSWORD } = process.env
+const { MONGO_HOST, MONGO_INITDB_ROOT_USERNAME, MONGO_INITDB_ROOT_PASSWORD } = process.env
 
-connect('mongodb://mongodb:27017', {
+connect(`mongodb://${MONGO_HOST}`, {
   auth: {
     username: MONGO_INITDB_ROOT_USERNAME,
     password: MONGO_INITDB_ROOT_PASSWORD,

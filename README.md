@@ -91,7 +91,7 @@ docker build --no-cache -t 0l-permission-tree .
 Now distribute the `0l-permission-tree:latest` docker image to your desired container orchestration platform.
 An example kubernetes template file is provided in [0l-permission-tree.yml](0l-permission-tree.yml).
 
-Replace `$NODE_HOSTNAME$`, `$CONTAINER_IMAGE$`, `$MONGO_INITDB_ROOT_USERNAME$`, and `$MONGO_INITDB_ROOT_PASSWORD$` in the template with valid values for the node to use for RPC calls, and the container repository URL, respectively.
+Replace `$NODE_HOSTNAME$`, `$CONTAINER_IMAGE$`, `$MONGO_HOST$`, `$MONGO_INITDB_ROOT_USERNAME$`, and `$MONGO_INITDB_ROOT_PASSWORD$` in the template with valid values for the node to use for RPC calls, and the container repository URL, respectively.
 
 It can be deployed with:
 

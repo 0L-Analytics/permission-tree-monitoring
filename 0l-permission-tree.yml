@@ -34,6 +34,8 @@ spec:
           value: "3028"
         - name: NODE_HOSTNAME
           value: $NODE_HOSTNAME$
+        - name: MONGO_HOST
+          value: $MONGO_HOST$
         - name: MONGO_INITDB_ROOT_USERNAME
           value: $MONGO_INITDB_ROOT_USERNAME$
         - name: MONGO_INITDB_ROOT_PASSWORD
