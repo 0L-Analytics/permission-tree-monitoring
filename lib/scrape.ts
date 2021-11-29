@@ -181,6 +181,7 @@ const scrape = async () => {
       {
         address: account,
         parent: '00000000000000000000000000000000',
+        epoch_onboarded: 0,
         version_onboarded: 0,
         has_tower: Boolean(towerHeight),
         is_active: Boolean(proofsInEpoch),
@@ -195,6 +196,7 @@ const scrape = async () => {
       {
         address: account,
         parent: '00000000000000000000000000000000',
+        epoch_onboarded: 0,
         version_onboarded: 0,
       },
       { upsert: true }
