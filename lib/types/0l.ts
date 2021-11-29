@@ -100,6 +100,7 @@ export interface EventData {
   preburn_address?: string
   role_id?: number
   created_address?: string
+  epoch?: number
 }
 
 export interface Event {

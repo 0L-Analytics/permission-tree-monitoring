@@ -1,5 +1,4 @@
 import API from './index'
-import getTypescriptAPI from '../types/api'
 import {
   AccountResponse,
   TransactionsResponse,
@@ -12,11 +11,9 @@ import {
 import { AxiosResponse } from 'axios'
 const { NODE_HOSTNAME } = process.env
 
-export const NodeAPI = getTypescriptAPI(
-  new API(`http://${NODE_HOSTNAME}:8080`, {
-    'Content-Type': 'application/json',
-  })
-)
+export const NodeAPI = new API(`http://${NODE_HOSTNAME}:8080`, {
+  'Content-Type': 'application/json',
+})
 
 const CallRPC = (method: string, params: any[]) =>
   NodeAPI.POST('', { method, jsonrpc: '2.0', id: 1, params })

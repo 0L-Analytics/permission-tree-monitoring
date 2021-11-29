@@ -17,6 +17,7 @@ services:
       - ./index.ts:/code/index.ts
       - ./tsconfig.json:/code/tsconfig.json
       - ./package.json:/code/package.json
+      - ./startCmd:/code/startCmd
   mongodb:
     image: mongo
     restart: always

@@ -2,9 +2,11 @@ FROM node:16-alpine
 WORKDIR /code
 COPY . .
 
-COPY scrape.cron /etc/cron.hourly/scrape
-RUN chmod 755 /etc/cron.hourly/scrape
+RUN chmod 755 /code/startCmd
+
+COPY scrape.cron /etc/periodic/hourly/scrape
+RUN chmod 755 /etc/periodic/hourly/scrape
 
 RUN yarn
 
-CMD [ "yarn", "ts-node", "index.ts" ]
+CMD [ "/code/startCmd" ]

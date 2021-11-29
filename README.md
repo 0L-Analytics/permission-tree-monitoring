@@ -45,7 +45,7 @@ interface PermissionNodeMiner {
   is_active: boolean // Has miner submitted proofs in current epoch?
 }
 
-interface MinerPermissionTreeResponse extends PermissionNodeValidator {
+interface MinerPermissionTreeResponse extends PermissionNodeMiner {
   children: PermissionNodeMiner[]
 }
 ```
