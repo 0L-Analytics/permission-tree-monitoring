@@ -8,6 +8,7 @@ import { TransactionsResponse } from './types/0l'
 import { AxiosResponse } from 'axios'
 import { get } from 'lodash'
 import { PermissionNodeMinerModel, PermissionNodeValidatorModel } from './db'
+import { connection } from 'mongoose'
 
 const TRANSACTIONS_PER_FETCH = 1000
 
@@ -206,6 +207,7 @@ const scrape = async () => {
   await scrapeRecursive(genesisAccounts)
 
   console.log('Done, time elapsed (s):', (Date.now() - startTime) / 1000)
+  connection.close()
 }
 
 scrape()
