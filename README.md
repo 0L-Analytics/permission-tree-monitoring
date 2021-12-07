@@ -80,7 +80,8 @@ interface MinerEpochsProofsResponse {
 ```typescript
 interface EpochsProofsSumResponse {
   epoch: number
-  count: number // Total number of miner proofs in epoch for all miners
+  miners: number
+  proofs: number // Total number of miner proofs in epoch for all miners
 }[]
 ```
 
@@ -91,7 +92,8 @@ interface EpochsProofsSumResponse {
 ```typescript
 interface EpochProofsResponse {
   epoch: number
-  count: number // Total number of miner proofs in epoch for all miners
+  miners: number
+  proofs: number // Total number of miner proofs in epoch for all miners
 }
 ```
 
