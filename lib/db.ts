@@ -50,3 +50,37 @@ export const PermissionNodeMinerModel = model<PermissionNodeMiner>(
   'PermissionNodeMiner',
   PermissionNodeMinerSchema
 )
+
+export interface Epoch {
+  epoch: number
+  height: number
+  timestamp: number
+}
+
+const EpochSchema = new Schema<Epoch>({
+  epoch: { type: Number, required: true },
+  height: { type: Number, required: true },
+  timestamp: { type: Number, required: true },
+})
+
+export const EpochSchemaModel = model<Epoch>(
+  'Epoch',
+  EpochSchema
+)
+
+export interface MinerEpochStats {
+  address: string
+  epoch: number
+  count: number
+}
+
+const MinerEpochStatsSchema = new Schema<MinerEpochStats>({
+  address: { type: String, required: true},
+  epoch: { type: Number, required: true },
+  count: { type: Number, required: true },
+})
+
+export const MinerEpochStatsSchemaModel = model<MinerEpochStats>(
+  'MinerEpochStats',
+  MinerEpochStatsSchema
+)

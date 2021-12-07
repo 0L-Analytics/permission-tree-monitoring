@@ -7,32 +7,51 @@ import {
 import { TransactionsResponse } from './types/0l'
 import { AxiosResponse } from 'axios'
 import { get } from 'lodash'
-import { PermissionNodeMinerModel, PermissionNodeValidatorModel } from './db'
+import { PermissionNodeMinerModel, PermissionNodeValidatorModel, EpochSchemaModel, MinerEpochStatsSchemaModel } from './db'
 import { connection } from 'mongoose'
 
 const TRANSACTIONS_PER_FETCH = 1000
 
 const scrapeRecursive = async (accounts) => {
-  const epochEventsRes = await getEvents({
-    key: '040000000000000000000000000000000000000000000000',
-    start: 0,
-    limit: 1000,
-  })
-
   const epochVersion = {}
-
   let currentEpoch = -1
 
-  for (const event of epochEventsRes.data.result) {
-    const epoch = event.data.epoch
-    const start_version = event.transaction_version
+  let start = 0
+  let epochEventsRes
+  do {
+    epochEventsRes = await getEvents({
+      key: '040000000000000000000000000000000000000000000000',
+      start,
+      limit: 1000,
+    })
 
-    currentEpoch = epoch
+    for (const event of epochEventsRes.data.result) {
+      const epoch = event.data.epoch
+      const start_version = event.transaction_version
 
-    epochVersion[epoch] = start_version
+      const transactionRes = await getTransactions({startVersion: start_version, limit: 1, includeEvents: false})
+      const expiration = get(transactionRes, 'data.result[0].transaction.timestamp_usecs')
+      const timestamp = expiration ? (expiration / 1000000) : undefined
 
-    console.log({ epoch, start_version })
-  }
+      currentEpoch = epoch
+
+      await EpochSchemaModel.findOneAndUpdate(
+        { epoch },
+        {
+          epoch,
+          height: start_version,
+          timestamp
+        },
+        { upsert: true }
+      )
+
+      epochVersion[epoch] = start_version
+
+      console.log({ epoch, start_version, timestamp })
+    }
+
+    start += 1000
+  } while (epochEventsRes.data.result.length === 1000)
 
   const getEpochForVersion = (version) => {
     for (let i = 0; i <= currentEpoch; i++) {
@@ -44,13 +63,15 @@ const scrapeRecursive = async (accounts) => {
   const nextAccounts = []
   for (const account of accounts) {
     let transactions: AxiosResponse<TransactionsResponse>
-    let lastHeight = 0
+    let start = 0
+
+    const proofsPerEpoch = {}
 
     do {
-      console.log('Getting batch of transactions', { account, lastHeight })
+      console.log('Getting batch of transactions', { account, start })
       transactions = await getAccountTransactions({
         account,
-        start: lastHeight,
+        start,
         limit: TRANSACTIONS_PER_FETCH,
         includeEvents: false,
       })
@@ -64,6 +85,12 @@ const scrapeRecursive = async (accounts) => {
         )
 
         if (transaction.vm_status.type !== 'executed') continue
+
+        if (functionName === 'minerstate_commit' || functionName === 'minerstate_commit_by_operator') {
+          const epoch = getEpochForVersion(transaction.version)
+          if (!proofsPerEpoch[epoch]) proofsPerEpoch[epoch] = 0
+          proofsPerEpoch[epoch]++
+        }
 
         const indexOfFunction = [
           'create_acc_val',
@@ -138,12 +165,22 @@ const scrapeRecursive = async (accounts) => {
         }
       }
 
-      if (transactions.data.result && transactions.data.result.length > 0) {
-        lastHeight =
-          transactions.data.result[transactions.data.result.length - 1]
-            .version + 1
-      }
+      start += TRANSACTIONS_PER_FETCH
     } while (transactions.data.result.length === TRANSACTIONS_PER_FETCH)
+
+    const minedEpochs = Object.keys(proofsPerEpoch)
+    for (const epochString of minedEpochs) {
+      const epoch = parseInt(epochString)
+      await MinerEpochStatsSchemaModel.findOneAndUpdate(
+        { epoch, address: account },
+        {
+          epoch, 
+          address: account,
+          count: proofsPerEpoch[epochString]
+        },
+        { upsert: true }
+      )
+    }
   }
 
   console.log('will scrape next set of accounts')
