@@ -130,6 +130,41 @@ const scrapeRecursive = async (accounts) => {
               account,
               onboardedAccount,
             })
+
+            const eventsKey = `0000000000000000${onboardedAccount}`
+            const eventsRes = await getEvents({ key: eventsKey, start: 0, limit: 20 })
+            const nonZeroEvents = eventsRes.data.result.filter((event) => event.data.sender !== '00000000000000000000000000000000')
+            const nonZeroEventTransactionsRes = await Promise.all(
+              nonZeroEvents.map((event) =>
+                getTransactions({
+                  startVersion: event.transaction_version,
+                  limit: 1,
+                  includeEvents: true,
+                })
+              )
+            )
+
+            for (const transaction of nonZeroEventTransactionsRes) {
+              const functionName = get(
+                transaction,
+                'data.result[0].transaction.script.function_name'
+              )
+              if (functionName === 'create_acc_val') {
+                const events = get(transaction, 'data.result[0].events')
+                if (events && events.length > 0) {
+                  const operatorCreateEvent = events.find(
+                    (event) =>
+                      get(event, 'data.type') === 'receivedpayment' &&
+                      get(event, 'data.receiver') !== onboardedAccount
+                  )
+                  if (operatorCreateEvent) {
+                    const operatorAccount = get(operatorCreateEvent, 'data.receiver')
+                    if (operatorAccount) nextAccounts.push(operatorAccount)
+                  }
+                }
+              }
+            }
+
           }
 
           const towerHeight = get(

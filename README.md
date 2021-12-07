@@ -50,6 +50,51 @@ interface MinerPermissionTreeResponse extends PermissionNodeMiner {
 }
 ```
 
+### Get Epochs
+
+`GET /epochs`
+
+```typescript
+interface EpochsResponse {
+  epoch: number
+  height: number
+  timestamp: number
+}[]
+```
+
+### Get Miner Proof Counts for all Epochs
+
+`GET /epochs/proofs/:address`
+
+```typescript
+interface MinerEpochsProofsResponse {
+  epoch: number
+  count: number // Total number of proofs in epoch for this miner
+}[]
+```
+
+### Get Epoch Total Miner Proof Counts
+
+`GET /epochs/proofs/sum`
+
+```typescript
+interface EpochsProofsSumResponse {
+  epoch: number
+  count: number // Total number of miner proofs in epoch for all miners
+}[]
+```
+
+### Get Epoch Total Miner Proof Counts
+
+`GET /epochs/proofs/sum/:epoch`
+
+```typescript
+interface EpochProofsResponse {
+  epoch: number
+  count: number // Total number of miner proofs in epoch for all miners
+}
+```
+
 ## Setup
 
 Install [docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/)
