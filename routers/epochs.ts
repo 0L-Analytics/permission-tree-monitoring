@@ -55,6 +55,27 @@ router.get('/proofs/sum/:epoch', async (ctx) => {
   }
 })
 
+router.get('/proofs/histogram/:epoch', async (ctx) => {
+  const { epoch: epochString } = ctx.params
+  const epoch = parseInt(epochString)
+  const boundaries = [ 0, 7, 15, 25, 35, 45, 55, 65, 73]
+  const epochSumRes = await MinerEpochStatsSchemaModel.aggregate([
+    { $match: { epoch } },
+    {
+      $bucket: {
+          groupBy: "$count",
+          boundaries,
+          default: "invalid"
+      }
+    }
+  ])
+  if (epochSumRes.length === 0) {
+    ctx.status = 404
+    return
+  }
+  ctx.body = epochSumRes.map((boundary, i) => ({ min: boundaries[i], max: boundaries[i+1] - 1, count: boundary.count }))
+})
+
 router.get('/proofs/:address', async (ctx) => {
   const { address } = ctx.params
   const epochStats = await MinerEpochStatsSchemaModel.find({ address }).sort([

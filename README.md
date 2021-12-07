@@ -85,7 +85,7 @@ interface EpochsProofsSumResponse {
 }[]
 ```
 
-### Get Epoch Total Miner Proof Counts
+### Get Epoch Total Miner Proof Counts for Epoch
 
 `GET /epochs/proofs/sum/:epoch`
 
@@ -94,6 +94,18 @@ interface EpochProofsResponse {
   epoch: number
   miners: number
   proofs: number // Total number of miner proofs in epoch for all miners
+}
+```
+
+### Get Epoch Total Miner Proof Count Histogram for Epoch
+
+`GET /epochs/proofs/histogram/:epoch`
+
+```typescript
+interface EpochProofsHistogramResponse {
+  min: number // range minimum
+  max: number // range maximum
+  count: number // miners with total proofs in the range (inclusive) for the specified epoch
 }
 ```
 
