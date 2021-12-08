@@ -11,6 +11,7 @@ connect(`mongodb://${MONGO_HOST}`, {
 
 export interface PermissionNodeValidator {
   address: string
+  operator_address: string
   parent: string
   epoch_onboarded: number
   version_onboarded: number
@@ -18,6 +19,7 @@ export interface PermissionNodeValidator {
 
 const PermissionNodeValidatorSchema = new Schema<PermissionNodeValidator>({
   address: { type: String, required: true },
+  operator_address: { type: String, required: true},
   parent: { type: String, required: true },
   epoch_onboarded: { type: Number, required: true },
   version_onboarded: { type: Number, required: true },

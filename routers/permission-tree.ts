@@ -33,6 +33,7 @@ router.get('/miner/:address', async (ctx) => {
 
 const VALIDATOR_PARAMS_TO_RETURN = [
   'address',
+  'operator_address',
   'parent',
   'epoch_onboarded',
   'version_onboarded',

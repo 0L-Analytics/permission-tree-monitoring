@@ -23,8 +23,10 @@ interface StatsResponse {
 ```typescript
 interface PermissionNodeValidator {
   address: string // Address of this validator
+  operator_address: string // Operator address of this validator
   parent: string // Address of validator that onboarded this validator
   version_onboarded: number // Height when validator was onboarded
+  epoch_onboarded: number // Epoch when validator was onboarded
 }
 
 interface ValidatorPermissionTreeResponse extends PermissionNodeValidator {
@@ -38,9 +40,10 @@ interface ValidatorPermissionTreeResponse extends PermissionNodeValidator {
 
 ```typescript
 interface PermissionNodeMiner {
-  address: string // Address of this validator
-  parent: string // Address of validator that onboarded this validator
-  version_onboarded: number // Height when validator was onboarded
+  address: string // Address of this account
+  parent: string // Address of validator that onboarded this account
+  version_onboarded: number // Height when account was onboarded
+  epoch_onboarded: number // Epoch when account was onboarded
   has_tower: boolean // Does miner have tower height > 0 ?
   is_active: boolean // Has miner submitted proofs in current epoch?
 }
@@ -82,6 +85,8 @@ interface EpochsProofsSumResponse {
   epoch: number
   miners: number
   proofs: number // Total number of miner proofs in epoch for all miners
+  validator_proofs: number // How many of the proofs were by validators
+  miner_proofs: number // How many of the proofs were by miners
 }[]
 ```
 
@@ -103,10 +108,9 @@ interface EpochProofsResponse {
 
 ```typescript
 interface EpochProofsHistogramResponse {
-  min: number // range minimum
-  max: number // range maximum
-  count: number // miners with total proofs in the range (inclusive) for the specified epoch
-}
+  proofs: number
+  count: number // miners with this total number of proofs for the specified epoch
+}[]
 ```
 
 ## Setup

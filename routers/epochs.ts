@@ -1,5 +1,9 @@
 import Router from '@koa/router'
-import { MinerEpochStatsSchemaModel, EpochSchemaModel } from '../lib/db'
+import {
+  MinerEpochStatsSchemaModel,
+  EpochSchemaModel,
+  PermissionNodeValidatorModel,
+} from '../lib/db'
 
 const router = new Router({ prefix: '/epochs' })
 
@@ -13,21 +17,52 @@ router.get('/', async (ctx) => {
 })
 
 router.get('/proofs/sum', async (ctx) => {
+  const validatorsRes = await PermissionNodeValidatorModel.find()
+  const validatorsAddresses = [
+    ...validatorsRes.map((validator) => validator.address),
+    ...validatorsRes.map((validator) => validator.operator_address),
+  ]
+
   const epochSumRes = await MinerEpochStatsSchemaModel.aggregate([
     {
       $group: {
         _id: '$epoch',
-        proofs: { $sum: '$count' },
+        totalProofs: { $sum: '$count' },
         miners: { $sum: 1 },
+        validatorProofs: {
+          $sum: {
+            $cond: [
+              {
+                $setIsSubset: [
+                  {
+                    $map: {
+                      input: ['A'],
+                      as: 'el',
+                      in: '$address',
+                    },
+                  },
+                  validatorsAddresses,
+                ],
+              },
+              '$count',
+              0,
+            ],
+          },
+        },
       },
     },
     { $sort: { _id: -1 } },
   ])
-
-  ctx.body = epochSumRes.map((agg) => ({
-    epoch: agg._id,
-    proofs: agg.proofs,
-    miners: agg.miners,
+  if (epochSumRes.length === 0) {
+    ctx.status = 404
+    return
+  }
+  ctx.body = epochSumRes.map((epochSum) => ({
+    epoch: epochSum._id,
+    miners: epochSum.miners,
+    proofs: epochSum.totalProofs,
+    validator_proofs: epochSum.validatorProofs,
+    miner_proofs: epochSum.totalProofs - epochSum.validatorProofs,
   }))
 })
 
@@ -58,22 +93,26 @@ router.get('/proofs/sum/:epoch', async (ctx) => {
 router.get('/proofs/histogram/:epoch', async (ctx) => {
   const { epoch: epochString } = ctx.params
   const epoch = parseInt(epochString)
-  const boundaries = [ 0, 7, 15, 25, 35, 45, 55, 65, 73]
+  const boundaries = []
+  for (let i = 0; i < 74; i++) boundaries.push(i)
   const epochSumRes = await MinerEpochStatsSchemaModel.aggregate([
     { $match: { epoch } },
     {
       $bucket: {
-          groupBy: "$count",
-          boundaries,
-          default: "invalid"
-      }
-    }
+        groupBy: '$count',
+        boundaries,
+        default: 'invalid',
+      },
+    },
   ])
   if (epochSumRes.length === 0) {
     ctx.status = 404
     return
   }
-  ctx.body = epochSumRes.map((boundary, i) => ({ min: boundaries[i], max: boundaries[i+1] - 1, count: boundary.count }))
+  ctx.body = epochSumRes.map((boundary, i) => ({
+    proofs: boundary._id,
+    count: boundary.count,
+  }))
 })
 
 router.get('/proofs/:address', async (ctx) => {

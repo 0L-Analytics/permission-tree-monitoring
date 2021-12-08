@@ -116,21 +116,6 @@ const scrapeRecursive = async (accounts) => {
             nextAccounts.push(onboardedAccount)
           if (isValidatorOnboard) {
             // validator onboard
-            await PermissionNodeValidatorModel.findOneAndUpdate(
-              { address: onboardedAccount },
-              {
-                address: onboardedAccount,
-                parent: account,
-                version_onboarded,
-                epoch_onboarded,
-              },
-              { upsert: true }
-            )
-            console.log('Found onboarded validator', {
-              account,
-              onboardedAccount,
-            })
-
             const eventsKey = `0000000000000000${onboardedAccount}`
             const eventsRes = await getEvents({ key: eventsKey, start: 0, limit: 20 })
             const nonZeroEvents = eventsRes.data.result.filter((event) => event.data.sender !== '00000000000000000000000000000000')
@@ -143,6 +128,8 @@ const scrapeRecursive = async (accounts) => {
                 })
               )
             )
+
+            let operator_address
 
             for (const transaction of nonZeroEventTransactionsRes) {
               const functionName = get(
@@ -158,12 +145,28 @@ const scrapeRecursive = async (accounts) => {
                       get(event, 'data.receiver') !== onboardedAccount
                   )
                   if (operatorCreateEvent) {
-                    const operatorAccount = get(operatorCreateEvent, 'data.receiver')
-                    if (operatorAccount) nextAccounts.push(operatorAccount)
+                    operator_address = get(operatorCreateEvent, 'data.receiver')
+                    if (operator_address) nextAccounts.push(operator_address)
                   }
                 }
               }
             }
+
+            await PermissionNodeValidatorModel.findOneAndUpdate(
+              { address: onboardedAccount },
+              {
+                address: onboardedAccount,
+                operator_address,
+                parent: account,
+                version_onboarded,
+                epoch_onboarded,
+              },
+              { upsert: true }
+            )
+            console.log('Found onboarded validator', {
+              account,
+              onboardedAccount,
+            })
 
           }
 
@@ -264,10 +267,16 @@ const scrape = async () => {
   }
 
   for (const account of genesisValidators) {
+    const operatorCreateEvent = genesisRes.data.result[0].events.find(
+      (event) => get(event, 'data.sender') === account
+    )
+    let operator_address
+    if (operatorCreateEvent) operator_address = get(operatorCreateEvent, 'data.receiver')
     await PermissionNodeValidatorModel.findOneAndUpdate(
       { address: account },
       {
         address: account,
+        operator_address,
         parent: '00000000000000000000000000000000',
         epoch_onboarded: 0,
         version_onboarded: 0,
