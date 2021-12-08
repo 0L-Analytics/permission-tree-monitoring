@@ -49,6 +49,66 @@ router.get('/proofs/sum', async (ctx) => {
             ],
           },
         },
+        minersPayable: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  {
+                    $not: [
+                      {
+                        $setIsSubset: [
+                          {
+                            $map: {
+                              input: ['A'],
+                              as: 'el',
+                              in: '$address',
+                            },
+                          },
+                          validatorsAddresses,
+                        ],
+                      },
+                    ],
+                  },
+                  { $gte: ['$count', 7] },
+                ],
+              },
+
+              1,
+              0,
+            ],
+          },
+        },
+        minerProofsPayable: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  {
+                    $not: [
+                      {
+                        $setIsSubset: [
+                          {
+                            $map: {
+                              input: ['A'],
+                              as: 'el',
+                              in: '$address',
+                            },
+                          },
+                          validatorsAddresses,
+                        ],
+                      },
+                    ],
+                  },
+                  { $gte: ['$count', 7] },
+                ],
+              },
+
+              '$count',
+              0,
+            ],
+          },
+        },
       },
     },
     { $sort: { _id: -1 } },
@@ -63,6 +123,8 @@ router.get('/proofs/sum', async (ctx) => {
     proofs: epochSum.totalProofs,
     validator_proofs: epochSum.validatorProofs,
     miner_proofs: epochSum.totalProofs - epochSum.validatorProofs,
+    miners_payable: epochSum.minersPayable,
+    miners_payable_proofs: epochSum.minerProofsPayable,
   }))
 })
 
