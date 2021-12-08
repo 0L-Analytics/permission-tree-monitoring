@@ -57,12 +57,14 @@ export interface Epoch {
   epoch: number
   height: number
   timestamp: number
+  miner_payment_total: number
 }
 
 const EpochSchema = new Schema<Epoch>({
   epoch: { type: Number, required: true },
   height: { type: Number, required: true },
   timestamp: { type: Number, required: true },
+  miner_payment_total: { type: Number, required: true },
 })
 
 export const EpochSchemaModel = model<Epoch>(

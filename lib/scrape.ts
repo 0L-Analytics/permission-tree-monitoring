@@ -12,7 +12,7 @@ import { connection } from 'mongoose'
 
 const TRANSACTIONS_PER_FETCH = 1000
 
-const scrapeRecursive = async (accounts) => {
+const scrapeRecursive = async (accounts, initial) => {
   const epochVersion = {}
   let currentEpoch = -1
 
@@ -25,13 +25,38 @@ const scrapeRecursive = async (accounts) => {
       limit: 1000,
     })
 
-    for (const event of epochEventsRes.data.result) {
+    for (const event of epochEventsRes.data.result.sort((a, b) => { b.data.epoch - a.data.epoch })) {
       const epoch = event.data.epoch
       const start_version = event.transaction_version
 
       const transactionRes = await getTransactions({startVersion: start_version, limit: 1, includeEvents: false})
       const expiration = get(transactionRes, 'data.result[0].transaction.timestamp_usecs')
       const timestamp = expiration ? (expiration / 1000000) : undefined
+
+      let miner_payment_total
+
+      if (initial) {
+        const epochRecord = await EpochSchemaModel.findOne({ epoch: epoch + 1 })
+        if (epochRecord) {
+          const transaction = await getTransactions({ startVersion: epochRecord.height, limit: 1, includeEvents: true })
+          const validatorsRes = await PermissionNodeValidatorModel.find()
+          const validatorsAddresses = [
+            ...validatorsRes.map((validator) => validator.address),
+            ...validatorsRes.map((validator) => validator.operator_address),
+          ]
+
+          for (const event of transaction.data.result[0].events) {
+            if (validatorsAddresses.indexOf(get(event, 'data.receiver')) !== -1) continue
+            if (event.data.sender === '00000000000000000000000000000000' && event.data.type === 'receivedpayment') {
+              const amount = get(event, 'data.amount.amount')
+              if (amount) {
+                if (miner_payment_total === undefined) miner_payment_total = 0
+                miner_payment_total += amount
+              }
+            }
+          }
+        }
+      }
 
       currentEpoch = epoch
 
@@ -40,7 +65,8 @@ const scrapeRecursive = async (accounts) => {
         {
           epoch,
           height: start_version,
-          timestamp
+          timestamp,
+          ...(miner_payment_total !== undefined && { miner_payment_total: isNaN(miner_payment_total) ? 0 : miner_payment_total })
         },
         { upsert: true }
       )
@@ -222,7 +248,7 @@ const scrapeRecursive = async (accounts) => {
   }
 
   console.log('will scrape next set of accounts')
-  if (nextAccounts.length > 0) await scrapeRecursive(nextAccounts)
+  if (nextAccounts.length > 0) await scrapeRecursive(nextAccounts, false)
 }
 
 const scrape = async () => {
@@ -285,7 +311,7 @@ const scrape = async () => {
     )
   }
 
-  await scrapeRecursive(genesisAccounts)
+  await scrapeRecursive(genesisAccounts, true)
 
   console.log('Done, time elapsed (s):', (Date.now() - startTime) / 1000)
   connection.close()
