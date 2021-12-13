@@ -15,6 +15,7 @@ export interface PermissionNodeValidator {
   parent: string
   epoch_onboarded: number
   version_onboarded: number
+  generation: number
 }
 
 const PermissionNodeValidatorSchema = new Schema<PermissionNodeValidator>({
@@ -23,6 +24,7 @@ const PermissionNodeValidatorSchema = new Schema<PermissionNodeValidator>({
   parent: { type: String, required: true },
   epoch_onboarded: { type: Number, required: true },
   version_onboarded: { type: Number, required: true },
+  generation: { type: Number, required: true}
 })
 
 export const PermissionNodeValidatorModel = model<PermissionNodeValidator>(
@@ -37,6 +39,7 @@ export interface PermissionNodeMiner {
   version_onboarded: number
   has_tower: boolean
   is_active: boolean
+  generation: number
 }
 
 const PermissionNodeMinerSchema = new Schema<PermissionNodeMiner>({
@@ -45,7 +48,8 @@ const PermissionNodeMinerSchema = new Schema<PermissionNodeMiner>({
   epoch_onboarded: { type: Number, required: true },
   version_onboarded: { type: Number, required: true },
   has_tower: { type: Boolean, required: true },
-  is_active: { type: Boolean, required: true }
+  is_active: { type: Boolean, required: true },
+  generation: { type: Number, required: true}
 })
 
 export const PermissionNodeMinerModel = model<PermissionNodeMiner>(

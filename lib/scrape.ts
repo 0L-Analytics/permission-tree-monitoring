@@ -12,7 +12,7 @@ import { connection } from 'mongoose'
 
 const TRANSACTIONS_PER_FETCH = 1000
 
-const scrapeRecursive = async (accounts, initial) => {
+const scrapeRecursive = async (accounts, generation) => {
   const epochVersion = {}
   let currentEpoch = -1
 
@@ -35,7 +35,7 @@ const scrapeRecursive = async (accounts, initial) => {
 
       let miner_payment_total
 
-      if (initial) {
+      if (generation === 1) {
         const epochRecord = await EpochSchemaModel.findOne({ epoch: epoch + 1 })
         if (epochRecord) {
           const transaction = await getTransactions({ startVersion: epochRecord.height, limit: 1, includeEvents: true })
@@ -99,7 +99,7 @@ const scrapeRecursive = async (accounts, initial) => {
         account,
         start,
         limit: TRANSACTIONS_PER_FETCH,
-        includeEvents: false,
+        includeEvents: true,
       })
 
       if (!transactions.data || !transactions.data.result) break
@@ -142,39 +142,17 @@ const scrapeRecursive = async (accounts, initial) => {
             nextAccounts.push(onboardedAccount)
           if (isValidatorOnboard) {
             // validator onboard
-            const eventsKey = `0000000000000000${onboardedAccount}`
-            const eventsRes = await getEvents({ key: eventsKey, start: 0, limit: 20 })
-            const nonZeroEvents = eventsRes.data.result.filter((event) => event.data.sender !== '00000000000000000000000000000000')
-            const nonZeroEventTransactionsRes = await Promise.all(
-              nonZeroEvents.map((event) =>
-                getTransactions({
-                  startVersion: event.transaction_version,
-                  limit: 1,
-                  includeEvents: true,
-                })
-              )
-            )
-
             let operator_address
 
-            for (const transaction of nonZeroEventTransactionsRes) {
-              const functionName = get(
-                transaction,
-                'data.result[0].transaction.script.function_name'
+            if (transaction.events && transaction.events.length > 0) {
+              const operatorCreateEvent = transaction.events.find(
+                (event) =>
+                  get(event, 'data.type') === 'receivedpayment' &&
+                  get(event, 'data.receiver') !== onboardedAccount
               )
-              if (functionName === 'create_acc_val') {
-                const events = get(transaction, 'data.result[0].events')
-                if (events && events.length > 0) {
-                  const operatorCreateEvent = events.find(
-                    (event) =>
-                      get(event, 'data.type') === 'receivedpayment' &&
-                      get(event, 'data.receiver') !== onboardedAccount
-                  )
-                  if (operatorCreateEvent) {
-                    operator_address = get(operatorCreateEvent, 'data.receiver')
-                    if (operator_address) nextAccounts.push(operator_address)
-                  }
-                }
+              if (operatorCreateEvent) {
+                operator_address = get(operatorCreateEvent, 'data.receiver')
+                if (operator_address) nextAccounts.push(operator_address)
               }
             }
 
@@ -186,6 +164,7 @@ const scrapeRecursive = async (accounts, initial) => {
                 parent: account,
                 version_onboarded,
                 epoch_onboarded,
+                generation
               },
               { upsert: true }
             )
@@ -193,7 +172,6 @@ const scrapeRecursive = async (accounts, initial) => {
               account,
               onboardedAccount,
             })
-
           }
 
           const towerHeight = get(
@@ -214,6 +192,7 @@ const scrapeRecursive = async (accounts, initial) => {
               epoch_onboarded,
               has_tower: Boolean(towerHeight),
               is_active: Boolean(proofsInEpoch),
+              generation
             },
             { upsert: true }
           )
@@ -248,7 +227,7 @@ const scrapeRecursive = async (accounts, initial) => {
   }
 
   console.log('will scrape next set of accounts')
-  if (nextAccounts.length > 0) await scrapeRecursive(nextAccounts, false)
+  if (nextAccounts.length > 0) await scrapeRecursive(nextAccounts, generation + 1)
 }
 
 const scrape = async () => {
@@ -287,6 +266,7 @@ const scrape = async () => {
         version_onboarded: 0,
         has_tower: Boolean(towerHeight),
         is_active: Boolean(proofsInEpoch),
+        generation: 0
       },
       { upsert: true }
     )
@@ -306,12 +286,13 @@ const scrape = async () => {
         parent: '00000000000000000000000000000000',
         epoch_onboarded: 0,
         version_onboarded: 0,
+        generation: 0
       },
       { upsert: true }
     )
   }
 
-  await scrapeRecursive(genesisAccounts, true)
+  await scrapeRecursive(genesisAccounts, 1)
 
   console.log('Done, time elapsed (s):', (Date.now() - startTime) / 1000)
   connection.close()

@@ -14,6 +14,8 @@ interface StatsResponse {
   allMinerCount: number, // All accounts with tower height > 0
   activeMinerCount: number // All accounts that have submitted proofs in current epoch
 }
+
+const response: StatsResponse
 ```
 
 ### Get Validator Permission Tree
@@ -32,6 +34,16 @@ interface PermissionNodeValidator {
 interface ValidatorPermissionTreeResponse extends PermissionNodeValidator {
   children: PermissionNodeValidator[]
 }
+
+const response: ValidatorPermissionTreeResponse
+```
+
+### Get all Validators
+
+`GET /permission-tree/validators`
+
+```typescript
+const response: PermissionNodeValidator[]
 ```
 
 ### Get Miner Permission Tree
@@ -51,6 +63,8 @@ interface PermissionNodeMiner {
 interface MinerPermissionTreeResponse extends PermissionNodeMiner {
   children: PermissionNodeMiner[]
 }
+
+const response: MinerPermissionTreeResponse
 ```
 
 ### Get Epochs
@@ -62,7 +76,9 @@ interface EpochsResponse {
   epoch: number
   height: number
   timestamp: number
-}[]
+}
+
+const response: EpochsResponse[]
 ```
 
 ### Get Miner Proof Counts for all Epochs
@@ -73,23 +89,9 @@ interface EpochsResponse {
 interface MinerEpochsProofsResponse {
   epoch: number
   count: number // Total number of proofs in epoch for this miner
-}[]
-```
+}
 
-### Get Epoch Total Miner Proof Counts
-
-`GET /epochs/proofs/sum`
-
-```typescript
-interface EpochsProofsSumResponse {
-  epoch: number
-  miners: number // Total accounts submitting proofs in epoch (miners and validators)
-  proofs: number // Total number of miner proofs in epoch for all miners
-  validator_proofs: number // How many of the proofs were by validators
-  miner_proofs: number // How many of the proofs were by miners
-  miners_payable: number // Number of miners that are above payment threshold
-  miners_payable_proofs: number // Total number of proofs submitted by miners that are above the payment threshold
-}[]
+const response: MinerEpochsProofsResponse[]
 ```
 
 ### Get Epoch Total Miner Proof Counts for Epoch
@@ -101,7 +103,19 @@ interface EpochProofsResponse {
   epoch: number
   miners: number
   proofs: number // Total number of miner proofs in epoch for all miners
+  validator_proofs: number // How many of the proofs were by validators
+  miner_proofs: number // How many of the proofs were by miners
+  miners_payable: number // Number of miners that are above payment threshold
+  miners_payable_proofs: number // Total number of proofs submitted by miners that are above the payment threshold
 }
+```
+
+### Get Epoch Total Miner Proof Counts
+
+`GET /epochs/proofs/sum`
+
+```typescript
+const response: EpochProofsResponse[]
 ```
 
 ### Get Epoch Total Miner Proof Count Histogram for Epoch
@@ -112,7 +126,9 @@ interface EpochProofsResponse {
 interface EpochProofsHistogramResponse {
   proofs: number
   count: number // miners with this total number of proofs for the specified epoch
-}[]
+}
+
+const response: EpochProofsHistogramResponse[]
 ```
 
 ## Setup

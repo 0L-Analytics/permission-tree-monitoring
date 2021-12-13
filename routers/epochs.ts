@@ -170,28 +170,125 @@ router.get('/proofs/sum', async (ctx) => {
   }))
 })
 
+
 router.get('/proofs/sum/:epoch', async (ctx) => {
   const { epoch: epochString } = ctx.params
   const epoch = parseInt(epochString)
+
+  const validatorsRes = await PermissionNodeValidatorModel.find()
+  const validatorsAddresses = [
+    ...validatorsRes.map((validator) => validator.address),
+    ...validatorsRes.map((validator) => validator.operator_address),
+  ]
+
+  const epochRecords = await EpochSchemaModel.findOne({epoch})
+
+
   const epochSumRes = await MinerEpochStatsSchemaModel.aggregate([
     { $match: { epoch } },
     {
       $group: {
         _id: '$epoch',
-        proofs: { $sum: '$count' },
+        totalProofs: { $sum: '$count' },
         miners: { $sum: 1 },
+        validatorProofs: {
+          $sum: {
+            $cond: [
+              {
+                $setIsSubset: [
+                  {
+                    $map: {
+                      input: ['A'],
+                      as: 'el',
+                      in: '$address',
+                    },
+                  },
+                  validatorsAddresses,
+                ],
+              },
+              '$count',
+              0,
+            ],
+          },
+        },
+        minersPayable: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  {
+                    $not: [
+                      {
+                        $setIsSubset: [
+                          {
+                            $map: {
+                              input: ['A'],
+                              as: 'el',
+                              in: '$address',
+                            },
+                          },
+                          validatorsAddresses,
+                        ],
+                      },
+                    ],
+                  },
+                  { $gte: ['$count', 8] },
+                ],
+              },
+
+              1,
+              0,
+            ],
+          },
+        },
+        minerProofsPayable: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  {
+                    $not: [
+                      {
+                        $setIsSubset: [
+                          {
+                            $map: {
+                              input: ['A'],
+                              as: 'el',
+                              in: '$address',
+                            },
+                          },
+                          validatorsAddresses,
+                        ],
+                      },
+                    ],
+                  },
+                  { $gte: ['$count', 8] },
+                ],
+              },
+
+              '$count',
+              0,
+            ],
+          },
+        },
       },
     },
+    { $sort: { _id: -1 } },
   ])
   if (epochSumRes.length === 0) {
     ctx.status = 404
     return
   }
-  ctx.body = {
-    epoch,
-    proofs: epochSumRes[0].proofs,
-    miners: epochSumRes[0].miners,
-  }
+  ctx.body = epochSumRes.map((epochSum) => ({
+    epoch: epochSum._id,
+    miners: epochSum.miners,
+    proofs: epochSum.totalProofs,
+    validator_proofs: epochSum.validatorProofs,
+    miner_proofs: epochSum.totalProofs - epochSum.validatorProofs,
+    miners_payable: epochSum.minersPayable,
+    miners_payable_proofs: epochSum.minerProofsPayable,
+    miner_payment_total: epochRecords.miner_payment_total
+  }))[0]
 })
 
 router.get('/proofs/histogram/:epoch', async (ctx) => {

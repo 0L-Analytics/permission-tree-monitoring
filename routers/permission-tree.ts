@@ -14,6 +14,7 @@ const MINER_PARAMS_TO_RETURN = [
   'version_onboarded',
   'has_tower',
   'is_active',
+  'generation'
 ]
 
 router.get('/miner/:address', async (ctx) => {
@@ -37,7 +38,13 @@ const VALIDATOR_PARAMS_TO_RETURN = [
   'parent',
   'epoch_onboarded',
   'version_onboarded',
+  'generation'
 ]
+
+router.get('/validators', async (ctx) => {
+  const validators = await PermissionNodeValidatorModel.find()
+  ctx.body = validators.map(validator => pick(validator, VALIDATOR_PARAMS_TO_RETURN))
+})
 
 router.get('/validator/:address', async (ctx) => {
   const address = ctx.params.address.toLowerCase()
