@@ -317,7 +317,7 @@ router.get('/proofs/histogram/:epoch', async (ctx) => {
 })
 
 router.get('/proofs/:address', async (ctx) => {
-  const { address } = ctx.params
+  const address = ctx.params.address.toLowerCase()
   const epochStats = await MinerEpochStatsSchemaModel.find({ address }).sort([
     ['epoch', -1],
   ])
