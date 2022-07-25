@@ -19,7 +19,7 @@ router.get('/', async (ctx) => {
 })
 
 router.get('/:account', async (ctx) => {
-  const b = await AccountBalanceModel.findOne({ address: ctx.params.account })
+  const b = await AccountBalanceModel.findOne({ address: ctx.params.account.toLowerCase() })
   if (!b){
     ctx.status = 404
     return
