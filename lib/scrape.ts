@@ -3,11 +3,19 @@ import {
   getAccountTransactions,
   getTowerState,
   getEvents,
+  getAccount,
 } from './api/node'
 import { TransactionsResponse } from './types/0l'
 import { AxiosResponse } from 'axios'
 import { get } from 'lodash'
-import { PermissionNodeMinerModel, PermissionNodeValidatorModel, EpochSchemaModel, MinerEpochStatsSchemaModel } from './db'
+import {
+  PermissionNodeMinerModel,
+  PermissionNodeValidatorModel,
+  EpochSchemaModel,
+  MinerEpochStatsSchemaModel,
+  AccountBalanceModel,
+} from './db'
+import communityWallets from './communityWallets'
 import { connection } from 'mongoose'
 
 const TRANSACTIONS_PER_FETCH = 1000
@@ -25,20 +33,33 @@ const scrapeRecursive = async (accounts, generation) => {
       limit: 1000,
     })
 
-    for (const event of epochEventsRes.data.result.sort((a, b) => { b.data.epoch - a.data.epoch })) {
+    for (const event of epochEventsRes.data.result.sort((a, b) => {
+      b.data.epoch - a.data.epoch
+    })) {
       const epoch = event.data.epoch
       const start_version = event.transaction_version
 
-      const transactionRes = await getTransactions({startVersion: start_version, limit: 1, includeEvents: false})
-      const expiration = get(transactionRes, 'data.result[0].transaction.timestamp_usecs')
-      const timestamp = expiration ? (expiration / 1000000) : undefined
+      const transactionRes = await getTransactions({
+        startVersion: start_version,
+        limit: 1,
+        includeEvents: false,
+      })
+      const expiration = get(
+        transactionRes,
+        'data.result[0].transaction.timestamp_usecs'
+      )
+      const timestamp = expiration ? expiration / 1000000 : undefined
 
       let miner_payment_total
 
       if (generation === 1) {
         const epochRecord = await EpochSchemaModel.findOne({ epoch: epoch + 1 })
         if (epochRecord) {
-          const transaction = await getTransactions({ startVersion: epochRecord.height, limit: 1, includeEvents: true })
+          const transaction = await getTransactions({
+            startVersion: epochRecord.height,
+            limit: 1,
+            includeEvents: true,
+          })
           const validatorsRes = await PermissionNodeValidatorModel.find()
           const validatorsAddresses = [
             ...validatorsRes.map((validator) => validator.address),
@@ -46,8 +67,12 @@ const scrapeRecursive = async (accounts, generation) => {
           ]
 
           for (const event of transaction.data.result[0].events) {
-            if (validatorsAddresses.indexOf(get(event, 'data.receiver')) !== -1) continue
-            if (event.data.sender === '00000000000000000000000000000000' && event.data.type === 'receivedpayment') {
+            if (validatorsAddresses.indexOf(get(event, 'data.receiver')) !== -1)
+              continue
+            if (
+              event.data.sender === '00000000000000000000000000000000' &&
+              event.data.type === 'receivedpayment'
+            ) {
               const amount = get(event, 'data.amount.amount')
               if (amount) {
                 if (miner_payment_total === undefined) miner_payment_total = 0
@@ -66,7 +91,11 @@ const scrapeRecursive = async (accounts, generation) => {
           epoch,
           height: start_version,
           timestamp,
-          ...(miner_payment_total !== undefined && { miner_payment_total: isNaN(miner_payment_total) ? 0 : miner_payment_total })
+          ...(miner_payment_total !== undefined && {
+            miner_payment_total: isNaN(miner_payment_total)
+              ? 0
+              : miner_payment_total,
+          }),
         },
         { upsert: true }
       )
@@ -112,7 +141,10 @@ const scrapeRecursive = async (accounts, generation) => {
 
         if (transaction.vm_status.type !== 'executed') continue
 
-        if (functionName === 'minerstate_commit' || functionName === 'minerstate_commit_by_operator') {
+        if (
+          functionName === 'minerstate_commit' ||
+          functionName === 'minerstate_commit_by_operator'
+        ) {
           const epoch = getEpochForVersion(transaction.version)
           if (!proofsPerEpoch[epoch]) proofsPerEpoch[epoch] = 0
           proofsPerEpoch[epoch]++
@@ -137,6 +169,10 @@ const scrapeRecursive = async (accounts, generation) => {
           const towerStateRes = await getTowerState({
             account: onboardedAccount,
           })
+          const balanceRes = await getAccount({ account: onboardedAccount })
+          const balance = balanceRes.data.result.balances.find(
+            (balance) => balance.currency.toLowerCase() === 'gas'
+          ).amount
 
           if (nextAccounts.indexOf(onboardedAccount) === -1)
             nextAccounts.push(onboardedAccount)
@@ -164,13 +200,14 @@ const scrapeRecursive = async (accounts, generation) => {
                 parent: account,
                 version_onboarded,
                 epoch_onboarded,
-                generation
+                generation,
               },
               { upsert: true }
             )
             console.log('Found onboarded validator', {
               account,
               onboardedAccount,
+              balance,
             })
           }
 
@@ -180,7 +217,17 @@ const scrapeRecursive = async (accounts, generation) => {
           )
           const proofsInEpoch = get(
             towerStateRes,
-            'data.result.count_proofs_in_epoch'
+            'data.result.actual_count_proofs_in_epoch'
+          )
+
+          await AccountBalanceModel.findOneAndUpdate(
+            { address: onboardedAccount },
+            {
+              address: onboardedAccount,
+              balance,
+              accountType: communityWallets[onboardedAccount.toLowerCase()] ? 'community' : (isValidatorOnboard ? 'validator' : (towerHeight > 0 ? 'miner' : 'basic')),
+            },
+            { upsert: true }
           )
 
           await PermissionNodeMinerModel.findOneAndUpdate(
@@ -192,7 +239,7 @@ const scrapeRecursive = async (accounts, generation) => {
               epoch_onboarded,
               has_tower: Boolean(towerHeight),
               is_active: Boolean(proofsInEpoch),
-              generation
+              generation,
             },
             { upsert: true }
           )
@@ -204,6 +251,7 @@ const scrapeRecursive = async (accounts, generation) => {
             epoch_onboarded,
             towerHeight,
             proofsInEpoch,
+            balance,
           })
         }
       }
@@ -217,9 +265,9 @@ const scrapeRecursive = async (accounts, generation) => {
       await MinerEpochStatsSchemaModel.findOneAndUpdate(
         { epoch, address: account },
         {
-          epoch, 
+          epoch,
           address: account,
-          count: proofsPerEpoch[epochString]
+          count: proofsPerEpoch[epochString],
         },
         { upsert: true }
       )
@@ -227,7 +275,8 @@ const scrapeRecursive = async (accounts, generation) => {
   }
 
   console.log('will scrape next set of accounts')
-  if (nextAccounts.length > 0) await scrapeRecursive(nextAccounts, generation + 1)
+  if (nextAccounts.length > 0)
+    await scrapeRecursive(nextAccounts, generation + 1)
 }
 
 const scrape = async () => {
@@ -242,19 +291,34 @@ const scrape = async () => {
 
   const genesisAccounts = genesisRes.data.result[0].events
     .filter((event) => event.data.type === 'receivedpayment')
-    .map((event) => event.data.receiver)
-  const genesisValidators = genesisRes.data.result[0].events
-    .filter(
-      (event) => event.data.type === 'createaccount' && event.data.role_id === 3
-    )
-    .map((event) => event.data.created_address)
 
-  for (const account of genesisAccounts) {
+  const genesisValidators = genesisRes.data.result[0].events
+    .filter((event) => event.data.type === 'createaccount' && event.data.role_id === 3).map((event) => event.data.created_address)
+
+  for (const event of genesisAccounts) {
+    const account = event.data.receiver
     const towerStateRes = await getTowerState({ account })
     const towerHeight = get(towerStateRes, 'data.result.verified_tower_height')
     const proofsInEpoch = get(
       towerStateRes,
-      'data.result.count_proofs_in_epoch'
+      'data.result.actual_count_proofs_in_epoch'
+    )
+
+    const isValidator = genesisValidators.indexOf(account) >= 0
+
+    const balanceRes = await getAccount({ account })
+    const balance = balanceRes.data.result.balances.find(
+      (balance) => balance.currency.toLowerCase() === 'gas'
+    ).amount
+
+    await AccountBalanceModel.findOneAndUpdate(
+      { address: account },
+      {
+        address: account,
+        balance,
+        accountType: communityWallets[account.toLowerCase()] ? 'community' : (isValidator ? 'validator' : (towerHeight > 0 ? 'miner' : 'basic')),
+      },
+      { upsert: true }
     )
 
     await PermissionNodeMinerModel.findOneAndUpdate(
@@ -266,36 +330,37 @@ const scrape = async () => {
         version_onboarded: 0,
         has_tower: Boolean(towerHeight),
         is_active: Boolean(proofsInEpoch),
-        generation: 0
+        generation: 0,
       },
       { upsert: true }
     )
+    if (isValidator) {
+      const operatorCreateEvent = genesisRes.data.result[0].events.find(
+        (event) => get(event, 'data.sender') === account
+      )
+      let operator_address
+      if (operatorCreateEvent)
+        operator_address = get(operatorCreateEvent, 'data.receiver')
+      await PermissionNodeValidatorModel.findOneAndUpdate(
+        { address: account },
+        {
+          address: account,
+          operator_address,
+          parent: '00000000000000000000000000000000',
+          epoch_onboarded: 0,
+          version_onboarded: 0,
+          generation: 0,
+        },
+        { upsert: true }
+      )
+    }
   }
 
-  for (const account of genesisValidators) {
-    const operatorCreateEvent = genesisRes.data.result[0].events.find(
-      (event) => get(event, 'data.sender') === account
-    )
-    let operator_address
-    if (operatorCreateEvent) operator_address = get(operatorCreateEvent, 'data.receiver')
-    await PermissionNodeValidatorModel.findOneAndUpdate(
-      { address: account },
-      {
-        address: account,
-        operator_address,
-        parent: '00000000000000000000000000000000',
-        epoch_onboarded: 0,
-        version_onboarded: 0,
-        generation: 0
-      },
-      { upsert: true }
-    )
-  }
-
-  await scrapeRecursive(genesisAccounts, 1)
+  await scrapeRecursive(genesisAccounts.map((event) => event.data.receiver), 1)
 
   console.log('Done, time elapsed (s):', (Date.now() - startTime) / 1000)
-  connection.close()
+  await connection.close()
+  process.exit(0)
 }
 
 scrape()

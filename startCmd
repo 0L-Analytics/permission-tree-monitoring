@@ -1,5 +1,9 @@
 #!/bin/sh
 
-echo "Starting cron"
-/usr/sbin/crond
+if [[ "$DISABLE_CRON" != "true" ]]; then
+  echo "Starting cron"
+  /usr/sbin/crond
+else
+  echo "Not running cron because DISABLE_CRON is true"
+fi
 yarn start

@@ -24,7 +24,7 @@ const PermissionNodeValidatorSchema = new Schema<PermissionNodeValidator>({
   parent: { type: String, required: true },
   epoch_onboarded: { type: Number, required: true },
   version_onboarded: { type: Number, required: true },
-  generation: { type: Number, required: true}
+  generation: { type: Number, required: true},
 })
 
 export const PermissionNodeValidatorModel = model<PermissionNodeValidator>(
@@ -49,7 +49,7 @@ const PermissionNodeMinerSchema = new Schema<PermissionNodeMiner>({
   version_onboarded: { type: Number, required: true },
   has_tower: { type: Boolean, required: true },
   is_active: { type: Boolean, required: true },
-  generation: { type: Number, required: true}
+  generation: { type: Number, required: true},
 })
 
 export const PermissionNodeMinerModel = model<PermissionNodeMiner>(
@@ -91,4 +91,21 @@ const MinerEpochStatsSchema = new Schema<MinerEpochStats>({
 export const MinerEpochStatsSchemaModel = model<MinerEpochStats>(
   'MinerEpochStats',
   MinerEpochStatsSchema
+)
+
+export interface AccountBalance {
+  address: string
+  accountType: string
+  balance: number
+}
+
+const AccountBalanceSchema = new Schema<AccountBalance>({
+  address: { type: String, required: true },
+  accountType: { type: String, required: true },
+  balance: { type: Number, required: true},
+})
+
+export const AccountBalanceModel = model<AccountBalance>(
+  'AccountBalance',
+  AccountBalanceSchema
 )

@@ -131,6 +131,36 @@ interface EpochProofsHistogramResponse {
 const response: EpochProofsHistogramResponse[]
 ```
 
+### Get Account Balances
+
+`GET /balances`
+
+```typescript
+interface BalanceResponse {
+  address: string
+  balance: number
+  account_type: string // one of: "community", "validator", "miner", or "basic
+}
+
+const response: BalanceResponse[]
+```
+
+### Get Account Balances for specific account type
+
+`GET /balances?account_type=validator`
+
+```typescript
+const response: BalanceResponse[]
+```
+
+### Get Account Balances for specific account
+
+`GET /balances/<address>`
+
+```typescript
+const response: BalanceResponse
+```
+
 ## Setup
 
 Install [docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/)

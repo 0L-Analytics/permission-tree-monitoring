@@ -9,6 +9,7 @@
     "email": "andrew.c.gouin@gmail.com"
   },
   "dependencies": {
+    "@koa/cors": "^3.3.0",
     "@koa/router": "^10.1.1",
     "@types/axios": "^0.14.0",
     "@types/node": "^16.11.10",

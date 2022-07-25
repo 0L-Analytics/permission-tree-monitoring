@@ -327,4 +327,17 @@ router.get('/proofs/:address', async (ctx) => {
   }))
 })
 
+router.get('/:epoch', async (ctx) => {
+  const epoch = await EpochSchemaModel.findOne({ epoch: ctx.params.epoch })
+  if (!epoch){
+    ctx.status = 404
+    return
+  }
+  ctx.body = {
+    epoch: epoch.epoch,
+    height: epoch.height,
+    timestamp: epoch.timestamp,
+  }
+})
+
 export default router
