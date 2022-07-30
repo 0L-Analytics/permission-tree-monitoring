@@ -214,8 +214,22 @@ const scrapeRecursive = async (accounts, generation, getEpochForVersion) => {
   }
 
   console.log('will scrape next set of accounts')
+
+  const nextGen = generation + 1
+
+  const nextGenAccounts = await PermissionNodeMinerModel.find({
+    generation: nextGen,
+  })
+
+  // include accounts that are already known
+  for (const account of nextGenAccounts) {
+    if (nextAccounts.indexOf(account.address) === -1) {
+      nextAccounts.push(account.address)
+    }
+  }
+
   if (nextAccounts.length > 0)
-    await scrapeRecursive(nextAccounts, generation + 1, getEpochForVersion)
+    await scrapeRecursive(nextAccounts, nextGen, getEpochForVersion)
 }
 
 const scrape = async () => {
