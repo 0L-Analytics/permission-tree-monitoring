@@ -14,112 +14,26 @@ import {
   EpochSchemaModel,
   MinerEpochStatsSchemaModel,
   AccountBalanceModel,
+  AccountLastProcessedModel,
 } from './db'
 import communityWallets from './communityWallets'
 import { connection } from 'mongoose'
 
 const TRANSACTIONS_PER_FETCH = 1000
 
-const scrapeRecursive = async (accounts, generation) => {
-  const epochVersion = {}
-  let currentEpoch = -1
-
-  let start = 0
-  let epochEventsRes
-  do {
-    epochEventsRes = await getEvents({
-      key: '040000000000000000000000000000000000000000000000',
-      start,
-      limit: 1000,
-    })
-
-    for (const event of epochEventsRes.data.result.sort((a, b) => {
-      b.data.epoch - a.data.epoch
-    })) {
-      const epoch = event.data.epoch
-      const start_version = event.transaction_version
-
-      const transactionRes = await getTransactions({
-        startVersion: start_version,
-        limit: 1,
-        includeEvents: false,
-      })
-      const expiration = get(
-        transactionRes,
-        'data.result[0].transaction.timestamp_usecs'
-      )
-      const timestamp = expiration ? expiration / 1000000 : undefined
-
-      let miner_payment_total
-
-      if (generation === 1) {
-        const epochRecord = await EpochSchemaModel.findOne({ epoch: epoch + 1 })
-        if (epochRecord) {
-          const transaction = await getTransactions({
-            startVersion: epochRecord.height,
-            limit: 1,
-            includeEvents: true,
-          })
-          const validatorsRes = await PermissionNodeValidatorModel.find()
-          const validatorsAddresses = [
-            ...validatorsRes.map((validator) => validator.address),
-            ...validatorsRes.map((validator) => validator.operator_address),
-          ]
-
-          for (const event of transaction.data.result[0].events) {
-            if (validatorsAddresses.indexOf(get(event, 'data.receiver')) !== -1)
-              continue
-            if (
-              event.data.sender === '00000000000000000000000000000000' &&
-              event.data.type === 'receivedpayment'
-            ) {
-              const amount = get(event, 'data.amount.amount')
-              if (amount) {
-                if (miner_payment_total === undefined) miner_payment_total = 0
-                miner_payment_total += amount
-              }
-            }
-          }
-        }
-      }
-
-      currentEpoch = epoch
-
-      await EpochSchemaModel.findOneAndUpdate(
-        { epoch },
-        {
-          epoch,
-          height: start_version,
-          timestamp,
-          ...(miner_payment_total !== undefined && {
-            miner_payment_total: isNaN(miner_payment_total)
-              ? 0
-              : miner_payment_total,
-          }),
-        },
-        { upsert: true }
-      )
-
-      epochVersion[epoch] = start_version
-
-      console.log({ epoch, start_version, timestamp })
-    }
-
-    start += 1000
-  } while (epochEventsRes.data.result.length === 1000)
-
-  const getEpochForVersion = (version) => {
-    for (let i = 0; i <= currentEpoch; i++) {
-      if (version < epochVersion[i]) return i - 1
-    }
-    return currentEpoch
-  }
-
+const scrapeRecursive = async (accounts, generation, getEpochForVersion) => {
   const nextAccounts = []
   for (const act of accounts) {
     const account = act.toLowerCase()
     let transactions: AxiosResponse<TransactionsResponse>
     let start = 0
+
+    const accountLastProcessed = await AccountLastProcessedModel.findOne({
+      address: account,
+    })
+    if (accountLastProcessed) {
+      start = accountLastProcessed.offset
+    }
 
     const proofsPerEpoch = {}
 
@@ -147,7 +61,16 @@ const scrapeRecursive = async (accounts, generation) => {
           functionName === 'minerstate_commit_by_operator'
         ) {
           const epoch = getEpochForVersion(transaction.version)
-          if (!proofsPerEpoch[epoch]) proofsPerEpoch[epoch] = 0
+          if (!proofsPerEpoch[epoch]) {
+            proofsPerEpoch[epoch] = 0
+            const existingStat = await MinerEpochStatsSchemaModel.findOne({
+              epoch,
+              address: account,
+            })
+            if (existingStat) {
+              proofsPerEpoch[epoch] = existingStat.count
+            }
+          }
           proofsPerEpoch[epoch]++
         }
 
@@ -226,7 +149,13 @@ const scrapeRecursive = async (accounts, generation) => {
             {
               address: onboardedAccount,
               balance,
-              accountType: communityWallets[onboardedAccount.toLowerCase()] ? 'community' : (isValidatorOnboard ? 'validator' : (towerHeight > 0 ? 'miner' : 'basic')),
+              accountType: communityWallets[onboardedAccount.toLowerCase()]
+                ? 'community'
+                : isValidatorOnboard
+                ? 'validator'
+                : towerHeight > 0
+                ? 'miner'
+                : 'basic',
             },
             { upsert: true }
           )
@@ -247,7 +176,6 @@ const scrapeRecursive = async (accounts, generation) => {
           console.log('Found onboarded miner', {
             account,
             onboardedAccount,
-            currentEpoch,
             version_onboarded,
             epoch_onboarded,
             towerHeight,
@@ -259,6 +187,16 @@ const scrapeRecursive = async (accounts, generation) => {
 
       start += TRANSACTIONS_PER_FETCH
     } while (transactions.data.result.length === TRANSACTIONS_PER_FETCH)
+
+    const newOffset = start + transactions.data.result.length - TRANSACTIONS_PER_FETCH
+    await AccountLastProcessedModel.findOneAndUpdate(
+      { address: account },
+      {
+        address: account,
+        offset: newOffset,
+      },
+      { upsert: true }
+    )
 
     const minedEpochs = Object.keys(proofsPerEpoch)
     for (const epochString of minedEpochs) {
@@ -277,7 +215,7 @@ const scrapeRecursive = async (accounts, generation) => {
 
   console.log('will scrape next set of accounts')
   if (nextAccounts.length > 0)
-    await scrapeRecursive(nextAccounts, generation + 1)
+    await scrapeRecursive(nextAccounts, generation + 1, getEpochForVersion)
 }
 
 const scrape = async () => {
@@ -290,11 +228,15 @@ const scrape = async () => {
     includeEvents: true,
   })
 
-  const genesisAccounts = genesisRes.data.result[0].events
-    .filter((event) => event.data.type === 'receivedpayment')
+  const genesisAccounts = genesisRes.data.result[0].events.filter(
+    (event) => event.data.type === 'receivedpayment'
+  )
 
   const genesisValidators = genesisRes.data.result[0].events
-    .filter((event) => event.data.type === 'createaccount' && event.data.role_id === 3).map((event) => event.data.created_address)
+    .filter(
+      (event) => event.data.type === 'createaccount' && event.data.role_id === 3
+    )
+    .map((event) => event.data.created_address)
 
   for (const event of genesisAccounts) {
     const account = event.data.receiver
@@ -317,7 +259,13 @@ const scrape = async () => {
       {
         address: account,
         balance,
-        accountType: communityWallets[account.toLowerCase()] ? 'community' : (isValidator ? 'validator' : (towerHeight > 0 ? 'miner' : 'basic')),
+        accountType: communityWallets[account.toLowerCase()]
+          ? 'community'
+          : isValidator
+          ? 'validator'
+          : towerHeight > 0
+          ? 'miner'
+          : 'basic',
       },
       { upsert: true }
     )
@@ -357,7 +305,103 @@ const scrape = async () => {
     }
   }
 
-  await scrapeRecursive(genesisAccounts.map((event) => event.data.receiver), 1)
+  const epochVersion = {}
+  let currentEpoch = -1
+
+  let start = 0
+  let epochEventsRes
+  do {
+    epochEventsRes = await getEvents({
+      key: '040000000000000000000000000000000000000000000000',
+      start,
+      limit: 1000,
+    })
+
+    for (const event of epochEventsRes.data.result.sort((a, b) => {
+      b.data.epoch - a.data.epoch
+    })) {
+      const epoch = event.data.epoch
+      const start_version = event.transaction_version
+
+      const transactionRes = await getTransactions({
+        startVersion: start_version,
+        limit: 1,
+        includeEvents: false,
+      })
+      const expiration = get(
+        transactionRes,
+        'data.result[0].transaction.timestamp_usecs'
+      )
+      const timestamp = expiration ? expiration / 1000000 : undefined
+
+      let miner_payment_total
+
+      const epochRecord = await EpochSchemaModel.findOne({ epoch: epoch + 1 })
+      if (epochRecord) {
+        const transaction = await getTransactions({
+          startVersion: epochRecord.height,
+          limit: 1,
+          includeEvents: true,
+        })
+        const validatorsRes = await PermissionNodeValidatorModel.find()
+        const validatorsAddresses = [
+          ...validatorsRes.map((validator) => validator.address),
+          ...validatorsRes.map((validator) => validator.operator_address),
+        ]
+
+        for (const event of transaction.data.result[0].events) {
+          if (validatorsAddresses.indexOf(get(event, 'data.receiver')) !== -1)
+            continue
+          if (
+            event.data.sender === '00000000000000000000000000000000' &&
+            event.data.type === 'receivedpayment'
+          ) {
+            const amount = get(event, 'data.amount.amount')
+            if (amount) {
+              if (miner_payment_total === undefined) miner_payment_total = 0
+              miner_payment_total += amount
+            }
+          }
+        }
+      }
+
+      currentEpoch = epoch
+
+      await EpochSchemaModel.findOneAndUpdate(
+        { epoch },
+        {
+          epoch,
+          height: start_version,
+          timestamp,
+          ...(miner_payment_total !== undefined && {
+            miner_payment_total: isNaN(miner_payment_total)
+              ? 0
+              : miner_payment_total,
+          }),
+        },
+        { upsert: true }
+      )
+
+      epochVersion[epoch] = start_version
+
+      console.log({ epoch, start_version, timestamp })
+    }
+
+    start += 1000
+  } while (epochEventsRes.data.result.length === 1000)
+
+  const getEpochForVersion = (version) => {
+    for (let i = 0; i <= currentEpoch; i++) {
+      if (version < epochVersion[i]) return i - 1
+    }
+    return currentEpoch
+  }
+
+  await scrapeRecursive(
+    genesisAccounts.map((event) => event.data.receiver),
+    1,
+    getEpochForVersion
+  )
 
   console.log('Done, time elapsed (s):', (Date.now() - startTime) / 1000)
   await connection.close()

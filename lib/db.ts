@@ -109,3 +109,18 @@ export const AccountBalanceModel = model<AccountBalance>(
   'AccountBalance',
   AccountBalanceSchema
 )
+
+export interface AccountLastProcessed {
+  address: string
+  offset: number
+}
+
+const AccountLastProcessedSchema = new Schema<AccountLastProcessed>({
+  address: { type: String, required: true },
+  offset: { type: Number, required: true},
+})
+
+export const AccountLastProcessedModel = model<AccountLastProcessed>(
+  'AccountLastProcessed',
+  AccountLastProcessedSchema
+)
