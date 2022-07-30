@@ -1,9 +1,20 @@
 #!/bin/sh
 
-if [[ "$DISABLE_CRON" != "true" ]]; then
-  echo "Starting cron"
-  /usr/sbin/crond
+if [[ "$NODE_ENV" = "development" ]]; then
+ yarn dev &
 else
-  echo "Not running cron because DISABLE_CRON is true"
+ yarn start &
 fi
-yarn start
+
+if [[ "$DISABLE_SCRAPE" != "true" ]]; then
+  echo "Starting scrape loop"
+  ./scrapeLoop &
+else
+  echo "Not running scrape loop because DISABLE_SCRAPE is true"
+fi
+
+# Wait for any process to exit
+wait -n
+  
+# Exit with status of process that exited first
+exit $?

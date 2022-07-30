@@ -116,7 +116,8 @@ const scrapeRecursive = async (accounts, generation) => {
   }
 
   const nextAccounts = []
-  for (const account of accounts) {
+  for (const act of accounts) {
+    const account = act.toLowerCase()
     let transactions: AxiosResponse<TransactionsResponse>
     let start = 0
 

@@ -2,13 +2,13 @@ version: '3'
 services:
   0l:
     build: .
-    command: yarn dev
     environment:
       - PORT=3028
-      - NODE_HOSTNAME=35.231.138.89
+      - NODE_ENV=development
       - MONGO_HOST=mongodb:27017
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=password
+      - DISABLE_SCRAPE=true
     ports:
       - "3028:3028"
     volumes:
