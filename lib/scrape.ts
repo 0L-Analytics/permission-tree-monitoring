@@ -60,7 +60,7 @@ const scrapeRecursive = async (accounts, generation, getEpochForVersion) => {
           functionName === 'minerstate_commit' ||
           functionName === 'minerstate_commit_by_operator'
         ) {
-          const epoch = getEpochForVersion(transaction.version)
+          const epoch = await getEpochForVersion(transaction.version)
           if (!proofsPerEpoch[epoch]) {
             proofsPerEpoch[epoch] = 0
             const existingStat = await MinerEpochStatsSchemaModel.findOne({
@@ -89,7 +89,7 @@ const scrapeRecursive = async (accounts, generation, getEpochForVersion) => {
             ? firstScriptArgument.substring(36, 68)
             : firstScriptArgument
           const version_onboarded = transaction.version
-          const epoch_onboarded = getEpochForVersion(version_onboarded)
+          const epoch_onboarded = await getEpochForVersion(version_onboarded)
           const towerStateRes = await getTowerState({
             account: onboardedAccount,
           })
@@ -132,6 +132,7 @@ const scrapeRecursive = async (accounts, generation, getEpochForVersion) => {
               account,
               onboardedAccount,
               balance,
+              generation,
             })
           }
 
@@ -181,19 +182,19 @@ const scrapeRecursive = async (accounts, generation, getEpochForVersion) => {
             towerHeight,
             proofsInEpoch,
             balance,
+            generation,
           })
         }
       }
 
-      start += TRANSACTIONS_PER_FETCH
+      start += transactions.data.result.length
     } while (transactions.data.result.length === TRANSACTIONS_PER_FETCH)
 
-    const newOffset = start + transactions.data.result.length - TRANSACTIONS_PER_FETCH
     await AccountLastProcessedModel.findOneAndUpdate(
       { address: account },
       {
         address: account,
-        offset: newOffset,
+        offset: start,
       },
       { upsert: true }
     )
@@ -215,21 +216,19 @@ const scrapeRecursive = async (accounts, generation, getEpochForVersion) => {
 
   console.log('will scrape next set of accounts')
 
-  const nextGen = generation + 1
-
-  const nextGenAccounts = await PermissionNodeMinerModel.find({
-    generation: nextGen,
+  const genAccounts = await PermissionNodeMinerModel.find({
+    generation: generation,
   })
 
   // include accounts that are already known
-  for (const account of nextGenAccounts) {
+  for (const account of genAccounts) {
     if (nextAccounts.indexOf(account.address) === -1) {
       nextAccounts.push(account.address)
     }
   }
 
   if (nextAccounts.length > 0)
-    await scrapeRecursive(nextAccounts, nextGen, getEpochForVersion)
+    await scrapeRecursive(nextAccounts, generation + 1, getEpochForVersion)
 }
 
 const scrape = async () => {
@@ -322,13 +321,13 @@ const scrape = async () => {
   const epochVersion = {}
   let currentEpoch = -1
 
-  let start = 0
+  let epochOffset = 0
   let epochEventsRes
   do {
     epochEventsRes = await getEvents({
       key: '040000000000000000000000000000000000000000000000',
-      start,
-      limit: 1000,
+      start: epochOffset,
+      limit: TRANSACTIONS_PER_FETCH,
     })
 
     for (const event of epochEventsRes.data.result.sort((a, b) => {
@@ -401,12 +400,47 @@ const scrape = async () => {
       console.log({ epoch, start_version, timestamp })
     }
 
-    start += 1000
-  } while (epochEventsRes.data.result.length === 1000)
+    epochOffset += epochEventsRes.data.result.length
+  } while (epochEventsRes.data.result.length === TRANSACTIONS_PER_FETCH)
 
-  const getEpochForVersion = (version) => {
+  const updateLatestEpoch = async () => {
+    console.log('updating latest epoch')
+    let epochEventsRes
+    let lastEpoch
+    do {
+      console.log('fetching epoch events', { start: epochOffset })
+      epochEventsRes = await getEvents({
+        key: '040000000000000000000000000000000000000000000000',
+        start: epochOffset,
+        limit: TRANSACTIONS_PER_FETCH,
+      })
+      if (epochEventsRes.data.result.length > 0) {
+        for (const event of epochEventsRes.data.result) {
+          epochVersion[event.data.epoch] = event.transaction_version
+        }
+        lastEpoch =
+          epochEventsRes.data.result[epochEventsRes.data.result.length - 1].data
+            .epoch
+      }
+
+      epochOffset += epochEventsRes.data.result.length
+    } while (epochEventsRes.data.result.length === TRANSACTIONS_PER_FETCH)
+    if (lastEpoch !== undefined) {
+      currentEpoch = lastEpoch
+    }
+  }
+
+  let lastEpochCheck = Date.now()
+
+  const getEpochForVersion = async (version) => {
     for (let i = 0; i <= currentEpoch; i++) {
       if (version < epochVersion[i]) return i - 1
+    }
+    // in or after current epoch
+    const newEpochCheck = Date.now()
+    if (newEpochCheck - lastEpochCheck > 5000) {
+      await updateLatestEpoch()
+      lastEpochCheck = newEpochCheck
     }
     return currentEpoch
   }
