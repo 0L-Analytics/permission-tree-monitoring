@@ -56,8 +56,6 @@ interface PermissionNodeMiner {
   parent: string // Address of validator that onboarded this account
   version_onboarded: number // Height when account was onboarded
   epoch_onboarded: number // Epoch when account was onboarded
-  has_tower: boolean // Does miner have tower height > 0 ?
-  is_active: boolean // Has miner submitted proofs in current epoch?
 }
 
 interface MinerPermissionTreeResponse extends PermissionNodeMiner {

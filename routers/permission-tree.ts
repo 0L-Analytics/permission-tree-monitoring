@@ -1,5 +1,7 @@
 import Router from '@koa/router'
 import {
+  EpochSchemaModel,
+  MinerEpochStatsSchemaModel,
   PermissionNodeMinerModel,
   PermissionNodeValidatorModel,
 } from '../lib/db'
@@ -12,9 +14,7 @@ const MINER_PARAMS_TO_RETURN = [
   'parent',
   'epoch_onboarded',
   'version_onboarded',
-  'has_tower',
-  'is_active',
-  'generation'
+  'generation',
 ]
 
 router.get('/miner/:address', async (ctx) => {
@@ -38,12 +38,14 @@ const VALIDATOR_PARAMS_TO_RETURN = [
   'parent',
   'epoch_onboarded',
   'version_onboarded',
-  'generation'
+  'generation',
 ]
 
 router.get('/validators', async (ctx) => {
   const validators = await PermissionNodeValidatorModel.find()
-  ctx.body = validators.map(validator => pick(validator, VALIDATOR_PARAMS_TO_RETURN))
+  ctx.body = validators.map((validator) =>
+    pick(validator, VALIDATOR_PARAMS_TO_RETURN)
+  )
 })
 
 router.get('/validator/:address', async (ctx) => {
@@ -63,12 +65,29 @@ router.get('/validator/:address', async (ctx) => {
 
 router.get('/stats', async (ctx) => {
   const allAccountCount = await PermissionNodeMinerModel.count()
-  const allMinerCount = await PermissionNodeMinerModel.count({
-    has_tower: true,
-  })
-  const activeMinerCount = await PermissionNodeMinerModel.count({
-    is_active: true,
-  })
+  const allMinerCountRes = await MinerEpochStatsSchemaModel.distinct('address')
+  const allMinerCount = allMinerCountRes.length
+
+  let activeMinerCount = 0
+  const latestEpochRes = await EpochSchemaModel.find({})
+    .select(['epoch'])
+    .sort({ epoch: -1 })
+    .limit(1)
+  console.log(latestEpochRes)
+  if (latestEpochRes.length === 1) {
+    const latestEpoch = latestEpochRes[0].epoch
+    const activeMinersRes = await MinerEpochStatsSchemaModel.aggregate([
+      {
+        $match: {
+          epoch: {
+            $in: [latestEpoch, latestEpoch - 1],
+          },
+        },
+      },
+      { $group: { _id: '$address' } },
+    ])
+    activeMinerCount = activeMinersRes.length
+  }
 
   ctx.body = {
     allAccountCount,

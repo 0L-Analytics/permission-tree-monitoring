@@ -13,6 +13,7 @@
     "@koa/router": "^10.1.1",
     "@types/axios": "^0.14.0",
     "@types/node": "^16.11.10",
+    "async-lock": "^1.3.2",
     "axios": "^0.24.0",
     "eventsource": "^1.1.0",
     "koa": "^2.13.4",
@@ -26,6 +27,6 @@
   "scripts": {
     "start": "ts-node index.ts",
     "dev": "nodemon index.ts --watch routers/",
-    "scrape": "ts-node lib/scrape.ts"
+    "scrape": "ts-node lib/scrape.ts --max_old_space_size=8192"
   }
 }

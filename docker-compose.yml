@@ -5,6 +5,7 @@ services:
     environment:
       - PORT=3028
       - NODE_ENV=development
+      - NODE_HOSTNAME=52.13.87.48
       - MONGO_HOST=mongodb:27017
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=password
