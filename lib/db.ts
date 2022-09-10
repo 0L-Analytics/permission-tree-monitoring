@@ -37,8 +37,6 @@ export interface PermissionNodeMiner {
   parent: string
   epoch_onboarded: number
   version_onboarded: number
-  has_tower: boolean
-  is_active: boolean
   generation: number
 }
 
@@ -47,8 +45,6 @@ const PermissionNodeMinerSchema = new Schema<PermissionNodeMiner>({
   parent: { type: String, required: true },
   epoch_onboarded: { type: Number, required: true },
   version_onboarded: { type: Number, required: true },
-  has_tower: { type: Boolean, required: true },
-  is_active: { type: Boolean, required: true },
   generation: { type: Number, required: true},
 })
 
@@ -61,6 +57,9 @@ export interface Epoch {
   epoch: number
   height: number
   timestamp: number
+  total_supply: number
+  minted: number
+  burned: number
   miner_payment_total: number
 }
 
@@ -68,6 +67,9 @@ const EpochSchema = new Schema<Epoch>({
   epoch: { type: Number, required: true },
   height: { type: Number, required: true },
   timestamp: { type: Number, required: true },
+  total_supply: { type: Number, required: true },
+  minted: { type: Number, required: true },
+  burned: { type: Number, required: true },
   miner_payment_total: { type: Number, required: true },
 })
 
@@ -95,13 +97,11 @@ export const MinerEpochStatsSchemaModel = model<MinerEpochStats>(
 
 export interface AccountBalance {
   address: string
-  accountType: string
   balance: number
 }
 
 const AccountBalanceSchema = new Schema<AccountBalance>({
   address: { type: String, required: true },
-  accountType: { type: String, required: true },
   balance: { type: Number, required: true},
 })
 
@@ -123,4 +123,19 @@ const AccountLastProcessedSchema = new Schema<AccountLastProcessed>({
 export const AccountLastProcessedModel = model<AccountLastProcessed>(
   'AccountLastProcessed',
   AccountLastProcessedSchema
+)
+
+export interface GlobalLastProcessed {
+  key: string
+  offset: number
+}
+
+const GlobalLastProcessedSchema = new Schema<GlobalLastProcessed>({
+  key: { type: String, required: true },
+  offset: { type: Number, required: true},
+})
+
+export const GlobalLastProcessedModel = model<GlobalLastProcessed>(
+  'GlobalLastProcessed',
+  GlobalLastProcessedSchema
 )

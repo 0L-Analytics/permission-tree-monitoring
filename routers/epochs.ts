@@ -3,6 +3,7 @@ import {
   MinerEpochStatsSchemaModel,
   EpochSchemaModel,
   PermissionNodeValidatorModel,
+  GlobalLastProcessedModel,
 } from '../lib/db'
 import { getTransactions } from '../lib/api/node'
 import { get } from 'lodash'
@@ -13,8 +14,11 @@ router.get('/', async (ctx) => {
   const epochs = await EpochSchemaModel.find().sort([['epoch', -1]])
   ctx.body = epochs.map((epoch) => ({
     epoch: epoch.epoch,
-    height: epoch.height,
     timestamp: epoch.timestamp,
+    height: epoch.height,
+    total_supply: epoch.total_supply,
+    minted: epoch.minted,
+    burned: epoch.burned,
   }))
 })
 
@@ -158,15 +162,18 @@ router.get('/proofs/sum', async (ctx) => {
     ctx.status = 404
     return
   }
+  const initialScrapeComplete = await GlobalLastProcessedModel.findOne({
+    key: 'initial_scrape_complete',
+  })
   ctx.body = epochSumRes.map((epochSum) => ({
     epoch: epochSum._id,
-    miners: epochSum.miners,
-    proofs: epochSum.totalProofs,
-    validator_proofs: epochSum.validatorProofs,
-    miner_proofs: epochSum.totalProofs - epochSum.validatorProofs,
-    miners_payable: epochSum.minersPayable,
-    miners_payable_proofs: epochSum.minerProofsPayable,
-    miner_payment_total: minerPayments[epochSum._id]
+    miners: initialScrapeComplete ? epochSum.miners : 'Updating',
+    proofs: initialScrapeComplete ? epochSum.totalProofs : 'Updating',
+    validator_proofs: initialScrapeComplete ? epochSum.validatorProofs : 'Updating',
+    miner_proofs: initialScrapeComplete ? (epochSum.totalProofs - epochSum.validatorProofs) : 'Updating',
+    miners_payable: initialScrapeComplete ? epochSum.minersPayable : 'Updating',
+    miners_payable_proofs: initialScrapeComplete ? epochSum.minerProofsPayable : 'Updating',
+    miner_payment_total: initialScrapeComplete ? minerPayments[epochSum._id]: 'Updating'
   }))
 })
 
@@ -335,8 +342,11 @@ router.get('/:epoch', async (ctx) => {
   }
   ctx.body = {
     epoch: epoch.epoch,
-    height: epoch.height,
     timestamp: epoch.timestamp,
+    height: epoch.height,
+    total_supply: epoch.total_supply,
+    minted: epoch.minted,
+    burned: epoch.burned,
   }
 })
 
