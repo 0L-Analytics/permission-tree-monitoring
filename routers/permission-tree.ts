@@ -63,6 +63,21 @@ router.get('/validator/:address', async (ctx) => {
   }
 })
 
+router.get('/operator/:address', async (ctx) => {
+  const address = ctx.params.address.toLowerCase()
+  console.log({ address })
+  const account = await PermissionNodeValidatorModel.findOne({ operator_address: address })
+  if (!account) {
+    ctx.status = 404
+    return
+  }
+  const children = await PermissionNodeValidatorModel.find({ parent: account.address })
+  ctx.body = {
+    ...pick(account, VALIDATOR_PARAMS_TO_RETURN),
+    children: children.map((child) => pick(child, VALIDATOR_PARAMS_TO_RETURN)),
+  }
+})
+
 router.get('/stats', async (ctx) => {
   const allAccountCount = await PermissionNodeMinerModel.count()
   const allMinerCountRes = await MinerEpochStatsSchemaModel.distinct('address')

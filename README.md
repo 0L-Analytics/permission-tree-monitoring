@@ -38,6 +38,14 @@ interface ValidatorPermissionTreeResponse extends PermissionNodeValidator {
 const response: ValidatorPermissionTreeResponse
 ```
 
+### Get Validator information from operator account
+
+`GET /permission-tree/operator/:address`
+
+```typescript
+const response: ValidatorPermissionTreeResponse
+```
+
 ### Get all Validators
 
 `GET /permission-tree/validators`
